@@ -12,7 +12,6 @@ from array import *
 #import util
 import math
 import random
-#import ROOT
 
 
 class Power_Meter(threading.Thread):
@@ -145,11 +144,11 @@ if __name__ == "__main__":
     fname = "./data/pin_calib_TellieRange.dat"
 
     pulse_delay_ms = 25e-3  # in ms (for direct input to set_pulse_delay func)
-    wavelength=435          # in nm
+    wavelength=495          # in nm
 
     # Set up range of widths to be run
-    #widths = range(6000,8200,20)
-    widths = [0,0]
+    widths = range(0,9000,100)
+    #widths = [0,6000]
     print widths
     
     channel = 5
@@ -207,7 +206,7 @@ if __name__ == "__main__":
         sc.set_pulse_width(width)
         time.sleep(0.1)
         sc.fire_continuous()
-        time.sleep(14)
+        time.sleep(10)
         tmpPPP = ppp_value
         tmpPPPErr = ppp_error
         tmpWatt = Watt_value
@@ -215,14 +214,14 @@ if __name__ == "__main__":
         time.sleep(1)
         sc.stop()
         with LOCK:
-            sc.fire()
+            sc.fire_sequence()
             #time.sleep(1)
-            pin = (None,None)
-            print "pin init ",pin[1]
-            while pin[1]==None:
-                pin = sc.read_pin()
+            pin = None
+            print "pin init ",pin
+            while pin==None:
+                pin, _ = sc.read_pin_sequence()
             try:
-                dataStr = "%i %i %i %i %1.7e %1.2e \n" % (width, int(pin[0][channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
+                dataStr = "%i %i %i %i %1.7e %1.2e \n" % (width, int(pin[channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
                 data.write(dataStr)
                 data.flush()
             except:
@@ -231,7 +230,7 @@ if __name__ == "__main__":
             
             # Print results
             print "*********** DATA FOR WIDTH: %4i ************" % (width)
-            outStr = "Width: \t\t%i \nPIN: \t\t%i \nPhoton no.: \t%1.4e +/- %1.1e \nWatts: \t\t%1.4e +/- %1.1e" % (width, int(pin[0][channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
+            outStr = "Width: \t\t%i \nPIN: \t\t%i \nPhoton no.: \t%1.4e +/- %1.1e \nWatts: \t\t%1.4e +/- %1.1e" % (width, int(pin[channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
             print outStr
             print "*********************************************"
             print ""

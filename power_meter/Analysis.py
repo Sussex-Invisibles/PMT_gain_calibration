@@ -51,28 +51,28 @@ def readData(fileName):
     return widths, PIN, watts, wattsErr
 
 def plotXY(x,y):
-    
+    """Return TGraph of x, y data sets"""
     # Plot data set
     plot = ROOT.TGraph(len(x), x, y)
-    plot.SetMarkerStyle(2)
+    plot.SetMarkerStyle(8)
+    plot.SetMarkerSize(0.5)
     plot.Draw("ap")
     #plot.GetYaxis().SetRangeUser(-1e-12,2.5e-7)
     plot.GetXaxis().SetRangeUser(0,max(x))
     tc.Modified(); tc.Update()
     time.sleep(5)
-
     return plot
 
-def plotErr(x,y,yErr):
-
+def plotErr(x,y,xErr,yErr):
+    """Return TGraphErrors of data sets"""
     # Plot data set
-    plot = ROOT.TGraphErrors(len(x), x, y, np.zeros(len(x)), yErr)
-    plot.SetMarkerStyle(1)
+    plot = ROOT.TGraphErrors(len(x), x, y, xErr, yErr)
+    plot.SetMarkerStyle(8)
+    plot.SetMarkerSize(0.5)
     plot.Draw("ap")
     #plot.GetYaxis().SetRangeUser(-1e-12,2.5e-7)
     plot.GetXaxis().SetRangeUser(0,max(x))
     tc.Modified(); tc.Update()
-
     return plot
 
 def pol1(x, p0, p1):
@@ -175,10 +175,11 @@ def calcSettings(p, noPh):
 if __name__ == "__main__":
 
     #fileName = "./data/pin_calib_Run2.dat"
-    fileName = "./power_meter/data/pin_calib_Run2.dat"
+    fileName = "./data/pin_calib_TellieRange.dat"
 
     # Read file
     header = readHeader(fileName)
+    print header["Wavelength"]
     widths, PIN, watts, wattsErr = readData(fileName)
 
     # Scale power values to give photons
@@ -189,7 +190,7 @@ if __name__ == "__main__":
     tc.SetLogy()
 
     # Make basic plot
-    tmpPlot = plotErr(widths,photons,photonErr)
+    tmpPlot = plotErr(widths,photons,np.zeros(len(widths)),photonErr)
     # Refine
     name = "PhotonsVsWidth"
     tmpPlot.SetTitle(name)
@@ -198,7 +199,8 @@ if __name__ == "__main__":
     #tmpPlot.GetYaxis().SetRangeUser(0.5e4,1e6)
     #tmpPlot.GetXaxis().SetRangeUser(6000,8000)
     #pars = lineExpFit(tmpPlot)
-    tc.SaveAs("./power_meter/results/{:s}.png".format(name))
+    tc.Update()
+    tc.SaveAs("./data/results/{:s}.png".format(name))
 
     tc.SetLogy(0)
     # Make PIN plot
@@ -208,20 +210,16 @@ if __name__ == "__main__":
     tmpPlot2.SetTitle(name)
     tmpPlot2.GetXaxis().SetTitle("LED pulse width (14 bit)")
     tmpPlot2.GetYaxis().SetTitle("PIN reading (14 bit)")
-    tc.SaveAs("./power_meter/results/{:s}.png".format(name));
+    tc.Update()
+    tc.SaveAs("./data/results/{:s}.png".format(name));
 
-    tc.SetLogx()
-    tmpPlot2 = plotXY(photons,PIN)
+    tc.SetLogx(0)
+    tc.SetLogy(0)
+    tmpPlot2 = plotErr(photons,PIN,photonErr,np.zeros(len(photonErr)))
     # Refine
     name = "PINVsPhotons"
     tmpPlot2.SetTitle(name)
     tmpPlot2.GetXaxis().SetTitle("No. Photons")
     tmpPlot2.GetYaxis().SetTitle("PIN reading (14 bit)")
-    tc.SaveAs("./power_meter/results/{:s}.png".format(name));
-
-
-
-
-
-
-
+    tc.Update()
+    tc.SaveAs("./data/results/{:s}.png".format(name));

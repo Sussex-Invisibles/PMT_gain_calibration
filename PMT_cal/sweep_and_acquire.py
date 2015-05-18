@@ -11,38 +11,35 @@
 # from tellie and leCroyScope directories
 # run "source env.sh" if these fail
 from core import serial_command
-import scope
+import scopes
+import scope_connections
+import sweep
 # standard libray stuff
 import time
 import sys
 import math
 import os
+import optparse
 import numpy as np
 
-
 def readPowerMeterFile(fileName):
-
+    """Read previously generated power meter file"""
     # Open file, read only the first line
     with open(fileName, 'r') as file:
         header = file.readline()
     # Return as dict.
     tmp = header.split(" ")
     head = {"Wavelength" : int(tmp[0]), "Pulse sep" : float(tmp[1]), "Rate" : int(tmp[2]), "Temp" : float(tmp[3]), "Pedestal" : float(tmp[4]) }
-
     noLin = sum(1 for line in open(fileName)) - 1  ###-1 to correct for header
 
-    # Define new arrays
-    widths = np.zeros(noLin)
-
     # Open file
-    c = 0
+    widths, c = np.zeros(noLin, dtype=int), 0
     with open(fileName, 'r') as file:
         next(file)
         for line in file:
             tmp = line.split(" ")
-            widths[c] = int(tmp[0])
+            widths[c] = np.int(tmp[0])
             c=c+1
-
     # return filled lists
     return head, widths
 
@@ -51,24 +48,21 @@ def readPowerMeterFile(fileName):
 #   MAIN FUNCTION
 ##########################
 if __name__ == "__main__":
+    parser = optparse.OptionParser()
+    parser.add_option("-f",dest="file",help="Power meter file to be loaded")
+    parser.add_option("-c",dest="channel",help="Channel number (1-8)")
+    parser.add_option("-v",dest="voltage",help="Gain setting at PMT (V)")
+    (options,args) = parser.parse_args()
+    total_time = time.time()
 
     # Read in power meter file to get width / frequency settings
-    fullRfile = "./power_meter/data/pin_calib_Run2.dat"
-    fullHeader, fullWidths = readPowerMeterFile(fullRfile)
+    header, widths = readPowerMeterFile(options.file)
 
-    selRangeFile = "./power_meter/data/pin_calib_TellieRange.dat"
-    selRangeHeader, widths = readPowerMeterFile(selRangeFile)
- 
-    # Sum two arrays but only keep unique enteries
-    #tmpWidths = np.concatenate([fullWidths, selWidths])
-    #widths = np.unique(tmpWidths)
-    #idx = np.where(widths > 7360)
-    #widths = widths[idx]
+    #widths = range(0,9000,1000)
     print widths
-    #widths = [0,6600,7000]
 
-    channel = 5
-    pulse_delay_ms = fullHeader["Pulse sep"]*1e3
+    channel = int(options.channel)
+    pulse_delay_ms = header["Pulse sep"]*1e3
 
     sc = serial_command.SerialCommand('/dev/tty.usbserial-FTGA2OCZ')
     sc.clear_channel()
@@ -80,81 +74,62 @@ if __name__ == "__main__":
     sc.set_trigger_delay(0)
     sc.set_pulse_height(16383)
 
-    scope_chan = 2
-    scp = scope.LeCroy684()
-    scp.set_x_scale( 2e-9)
-    scp.set_y_scale(scope_chan, 2, "V")
-    scp.set_y_position(scope_chan, 3, "V")
-    scp.set_trigger_mode("single")
-    scp.set_trigger_delay(20) # as percentage of full hoizontal scale
-    scp.set_trigger(scope_chan, -0.5, True)
-    scp.enable_trigger()
-    scp.clear_sweeps()
+    #run the initial setup on the scope
+    usb_conn = scope_connections.VisaUSB()
+    scope = scopes.Tektronix3000(usb_conn)
+    ###########################################
+    scope_chan = 1 # We're using channel 1!
+    termination = 50 # Ohms
+    trigger_level = 0.5 # half peak minimum
+    falling_edge = True
+    min_trigger = -0.004
+    y_div_units = 1 # volts
+    x_div_units = 10e-9 # seconds
+    y_offset = 0.5*y_div_units # offset in y (for UK scope)
+    x_offset = +2*x_div_units # offset in x (2 divisions to the left)
+    record_length = 100e3 # trace is 1e3 samples long
+    half_length = record_length / 2 # For selecting region about trigger point
+    ###########################################
+    scope.unlock()
+    scope.set_horizontal_scale(x_div_units)
+    scope.set_horizontal_delay(x_offset) #shift to the left 2 units
+    scope.set_channel_y(scope_chan, y_div_units, pos=2.5)
+    scope.set_channel_termination(scope_chan, termination)
+    scope.set_single_acquisition() # Single signal acquisition mode
+    scope.set_record_length(record_length)
+    scope.set_data_mode(half_length-50, half_length+50)
+    scope.lock()
+    scope.begin() # Acquires the pre-amble!
 
-    est_RunTime = (75*len(widths))/60
-    print "For {:d} data points, the code will likely take : {:1.1f} mins".format(len(widths), est_RunTime)
-    print "####################################################"
-    print "Code will be finished at :", time.asctime( time.localtime(time.time()+(est_RunTime*60)) )
-    print "####################################################"
+    #File system stuff
+    saveDir = sweep.check_dir("data/scope_data_%1.1fV/" % float(options.voltage))
+    sweep.check_dir("%sraw_data/" % saveDir)
+    output_filename = "%s/Chan%02d_%1.1fV.dat" % (saveDir,channel,float(options.voltage))
+    output_file = file(output_filename,'w')
+    output_file.write("#PWIDTH\tPWIDTH Error\tPIN\tPIN Error\tWIDTH\tWIDTH Error\tRISE\tRISE Error\tFALL\t\
+FALL Error\tAREA\tAREA Error\tMinimum\tMinimum Error\n")
 
-    tmp = [widths[1], widths[65], widths[70]]
-    tmp = [widths[70],widths[75],widths[80],widths[85],widths[90],widths[95]]
-    tmp = [widths[109]]
-
-    flag = 0
+    flag, tmpResults, min_volt = 0, None, None
     run_start = time.time()
     for width in widths:
         loop_start = time.time()
-        sc.set_pulse_width(int(width))
         print "WIDTH: {:d}".format(int(width))
-        time.sleep(0.1)
-        sc.fire_continuous()
-        scp.clear_sweeps()
-     
-        if(width > 7300 and width < 7450):
-            flag=1
-            scp.set_y_scale(scope_chan, 0.5, "V")
-            scp.set_y_position(scope_chan, 1.5, "V")
-            scp.set_trigger(scope_chan, -0.2, True)
-        elif(width >= 7450 and width < 7580):
-            flag=2
-            scp.set_y_scale(scope_chan, 200, "MV")
-            scp.set_y_position(scope_chan, 600, "MV")
-        elif(width >= 7600 and width < 7680):
-            flag=3
-            scp.set_y_scale(scope_chan, 50, "MV")
-            scp.set_y_position(scope_chan, 150, "MV")
-            scp.set_trigger(scope_chan, -0.03, True)
-        elif(width >= 7600 and width < 7720):
-            flag=4
-            scp.set_y_scale(scope_chan, 10, "MV")
-            scp.set_y_position(scope_chan, 30, "MV")
-            scp.set_trigger(scope_chan, -0.005, True)
-        elif(width >= 7720 and width < 7800):
-            flag=5
-            scp.set_y_scale(scope_chan, 5, "MV")
-            scp.set_y_position(scope_chan, 15, "MV")
-            scp.set_trigger(scope_chan, -0.005, True)
-        elif(width >= 7800):
-            flag=5
-            scp.set_y_scale(scope_chan, 2, "MV")
-            scp.set_y_position(scope_chan, 4, "MV")
-            scp.set_trigger(scope_chan, -0.004, True)
+        if tmpResults!=None:
+            #set a best guess for the trigger and the scale
+            #using the last sweeps value
+            min_volt = float(tmpResults["peak"])
 
-        ## TEST STUFF
-        #scp.set_trigger_mode("normal")
-        #time.sleep(60)
+        tmpResults = sweep.sweep(saveDir,1,channel,width,pulse_delay_ms,scope,min_volt)        
 
-        savePath = "/Users/js376/Desktop/PMT_cal_data/TellieRange_reRun/width_{:d}/".format(int(width))
-        if not os.path.exists(savePath):
-           os.makedirs(savePath)
-        for i in range(1000):
-            saveFile = "{}pulse_{:d}.dat".format(savePath,i)
-            #print saveFile
-            #scp.get_waveform(scope_chan)
-            scp.save_waveform(scope_chan, saveFile)
-            time.sleep(0.01)
+        output_file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n"%(width, 0,
+                                            tmpResults["pin"], 0,
+                                            tmpResults["width"], tmpResults["width error"],
+                                            tmpResults["rise"], tmpResults["rise error"],
+                                            tmpResults["fall"], tmpResults["fall error"],
+                                            tmpResults["area"], tmpResults["area error"],
+                                            tmpResults["peak"], tmpResults["peak error"] ))
 
-        
-        sc.stop()
-        print "Loop took : {:1.1f} s".format(time.time() - loop_start)
+        print "WIDTH %d took : %1.1f s" % (width, time.time()-loop_start)
+
+    output_file.close()
+    print "Total script time : %1.1f mins"%( (time.time() - total_time) / 60)
