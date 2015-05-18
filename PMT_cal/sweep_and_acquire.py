@@ -58,7 +58,7 @@ if __name__ == "__main__":
     # Read in power meter file to get width / frequency settings
     header, widths = readPowerMeterFile(options.file)
 
-    #widths = range(0,9000,1000)
+    #widths = range(7200,7500,100)
     print widths
 
     channel = int(options.channel)
@@ -90,7 +90,6 @@ if __name__ == "__main__":
     record_length = 100e3 # trace is 1e3 samples long
     half_length = record_length / 2 # For selecting region about trigger point
     ###########################################
-    scope.unlock()
     scope.set_horizontal_scale(x_div_units)
     scope.set_horizontal_delay(x_offset) #shift to the left 2 units
     scope.set_channel_y(scope_chan, y_div_units, pos=2.5)
@@ -113,7 +112,6 @@ FALL Error\tAREA\tAREA Error\tMinimum\tMinimum Error\n")
     run_start = time.time()
     for width in widths:
         loop_start = time.time()
-        print "WIDTH: {:d}".format(int(width))
         if tmpResults!=None:
             #set a best guess for the trigger and the scale
             #using the last sweeps value
