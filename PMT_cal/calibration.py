@@ -20,26 +20,21 @@ import matplotlib
 import ROOT
 
 def readHeader(fileName):
-    
     # Open file, read only the first line
     with open(fileName, 'r') as file:
         header = file.readline()
     tmp = header.split(" ")
-    
     # Return as dict.
     return {"Wavelength" : int(tmp[0]), "Pulse sep" : float(tmp[1]), "Rate" : int(tmp[2]), "Temp" : float(tmp[3]), "Pedestal" : float(tmp[4]) }
 
 
 def readData(fileName):
-    
     # Find no. of lines
-    noLin = sum(1 for line in open(fileName)) - 1  ###-1 to correct for header
-    
+    noLin = sum(1 for line in open(fileName)) - 1  ###-1 to correct for header    
     # Define new arrays
     widths, PIN = np.zeros(noLin), np.zeros(noLin)
     photons, photonErr = np.zeros(noLin), np.zeros(noLin)
     watts, wattsErr = np.zeros(noLin), np.zeros(noLin)
-    
     # Open file
     c = 0
     with open(fileName, 'r') as file:
@@ -53,38 +48,29 @@ def readData(fileName):
             watts[c] = float(tmp[4])
             wattsErr[c] = float(tmp[5])
             c=c+1
-    
     # return filled lists
     return widths, PIN, watts, wattsErr
 
 
 def scaling(rawArr, rawErr, header):
-    
     # New arrays
     scaledArr, scaledErr = np.zeros( len(rawArr) ), np.zeros( len(rawArr) )
-    
     # Calculate photon energy (J)
     ePh = (6.626e-34 * 3e8) / (header["Wavelength"]*1e-9)
-    
     # Duty cycle stuff
     pulseWidth = 10e-9;
     ratio = header["Pulse sep"]/pulseWidth
-    
     for i, val in enumerate(rawArr):
         # Calaulate peak power
         pp = rawArr[i] * ratio
         ppErr = rawErr[i] * ratio
-        
         # Calculate no of photons
         scaledArr[i] = (pp*pulseWidth) / ePh
         scaledErr[i] = (ppErr*pulseWidth) / ePh
-    
     return scaledArr, scaledErr
-
 
 def integrate(x, y):
     return np.trapz(y, dx=(x[1]-x[0]))
-
 
 def calcGain(integral,width,w1,p1,p1Err,w2,p2,p2Err):
     a = np.where( w2 == width )
@@ -96,9 +82,7 @@ def calcGain(integral,width,w1,p1,p1Err,w2,p2,p2Err):
         idx = np.where( w1 == width )[0][0]
         nPh = p1[idx]
         nPhErr = p1Err[idx]
-
     return abs(integral / (nPh*1.6e-19)), nPh, nPhErr
-
 
 def straightLineEq(x1,x2,y1,y2):
     dy = y1-y2
@@ -109,19 +93,14 @@ def straightLineEq(x1,x2,y1,y2):
 
 def calcRiseTime(x,y):
     y=np.array(y) # force to loop like numpy array
- 
     # Find max amplitude
     index = np.argmin( y )
-    
     upRange = 0.9*y[index]
     loRange = 0.1*y[index]
-    
     first = np.where( y < loRange )[0][0]
     last = np.where( y < upRange )[0][0]
-    
     m1,c1 = straightLineEq(x[(first-1)], x[first], y[(first-1)], y[first])
     m2,c2 = straightLineEq(x[(last-1)], x[last], y[(last-1)], y[last])
-    
     time1 = (loRange - c1) / m1
     time2 = (upRange - c2) / m2
     #print time1, time2, time2-time1
