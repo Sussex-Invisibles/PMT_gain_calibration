@@ -101,9 +101,9 @@ if __name__ == "__main__":
     scope.begin() # Acquires the pre-amble!
 
     #File system stuff
-    saveDir = sweep.check_dir("data/scope_data_%1.1fV/" % float(options.voltage))
+    saveDir = sweep.check_dir("data/scope_data_%1.2fV/" % float(options.voltage))
     sweep.check_dir("%sraw_data/" % saveDir)
-    output_filename = "%s/Chan%02d_%1.1fV.dat" % (saveDir,channel,float(options.voltage))
+    output_filename = "%s/Chan%02d_%1.2fV.dat" % (saveDir,channel,float(options.voltage))
     output_file = file(output_filename,'w')
     output_file.write("#PWIDTH\tPWIDTH Error\tPIN\tPIN Error\tWIDTH\tWIDTH Error\tRISE\tRISE Error\tFALL\t\
 FALL Error\tAREA\tAREA Error\tMinimum\tMinimum Error\n")
