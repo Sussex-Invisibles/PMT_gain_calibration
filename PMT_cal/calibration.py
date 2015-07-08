@@ -73,12 +73,12 @@ def read_pin_data(fileName):
 def get_clean_data_points(widths, gain, path):
     '''Check all data points for saturation or 0 result.'''
     index = []
-    for i, width in enumerate(widths):
-        file = '%s/Width%05d.pkl' % (path, width)
+    for i, g in enumerate(gain):
+        file = '%s/Width%05d.pkl' % (path, widths[i])
         if os.path.isfile(file):
             x, y = calc.readPickleChannel(file, 1)
             print i, len(widths)
-            if check_saturation(y) is False:# and gain[i] > 0:
+            if check_saturation(y) is False and gain[i] > 0:
                 index.append(i)
     return index
 
@@ -209,9 +209,8 @@ if __name__ == "__main__":
     widths, pin, pinErr = wi[idx], PIN[idx], PINErr[idx]
 
     ######### PLOT RESULTS ##########
-    check_dir('results/%s/' % p[-2])
+    check_dir('results/%s/' % p[-1])
     voltage = get_num_from_str(p[-2])
-    print gain, gainErr
     final_gain, final_gain_err = weighted_avg_and_std(gain[:-2], gainErr[:-2])
     print ######################################
     print "\nGain at %1.1fV is: %.3e +/- %.3e\n" % (voltage, final_gain, final_gain_err)
@@ -240,16 +239,16 @@ if __name__ == "__main__":
     axis = plt.gca()
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     axis.text(0.65, 0.95, text_str, transform=axis.transAxes, fontsize=14,verticalalignment='top', bbox=props)
-    saveStr = 'results/%s/GainVsPhotons.png' % p[1]
+    saveStr = 'results/%s/GainVsPhotons.png' % p[-1]
     plt.savefig(saveStr, dpi=100)
 
     plt.figure(num=2, figsize=(10, 8), dpi=80, facecolor='w')
-    ax = plt.errorbar(wi, g, gErr, fmt = '', marker='x')
+    ax = plt.errorbar(widths, gain, gainErr, fmt = '', marker='x')
     plt.title("Gain as a function of IPW")
     plt.xlabel("IPW (14 bit)")
     plt.ylabel("Gain")
     #plt.show()                                                                                                                         
-    saveStr = 'results/%s/GainVsIPW.png' % p[1]
+    saveStr = 'results/%s/GainVsIPW.png' % p[-1]
     plt.savefig(saveStr, dpi=100)
 
     plt.figure(num=3, figsize=(10, 8), dpi=80, facecolor='w')
@@ -258,16 +257,16 @@ if __name__ == "__main__":
     plt.xlabel("PIN (16 bit)")
     plt.ylabel("No. photons")
     plt.legend()
-    saveStr = 'results/%s/PINVsPhotons.png' % p[1]
+    saveStr = 'results/%s/PINVsPhotons.png' % p[-1]
     plt.savefig(saveStr, dpi=100)
 
     plt.figure(num=4, figsize=(10, 8), dpi=80, facecolor='w')
-    ax = plt.plot(wi, PIN, 'x')
+    ax = plt.errorbar(wi, PIN, PINErr, fmt='', marker='x')
     plt.title("IPW as a function of PIN readout")
     plt.xlabel("IPW (14 bit)")
     plt.ylabel("PIN (16 bit)")
     plt.legend()
-    saveStr = 'results/%s/IPWVsPIN.png' % p[1]
+    saveStr = 'results/%s/IPWVsPIN.png' % p[-1]
     plt.savefig(saveStr, dpi=100)
 
     print "Script took : \t{:1.2f} min".format( (time.time()-scriptTime)/60 )
