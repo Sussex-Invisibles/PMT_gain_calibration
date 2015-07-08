@@ -5,7 +5,6 @@
 # Author: Ed Leming
 # Date: 18/10/2014
 #####################################################
-
 import ROOT
 from ROOT import kRed, kBlue, kWhite
 import time
@@ -41,6 +40,7 @@ def readData(fileName):
             tmp = line.split(" ")
             widths[c] = int(tmp[0])
             PIN[c] = int(tmp[1])
+            PINErr[c] = float(tmp[2])
             photons[c] = int(tmp[2])
             photonErr[c] = int(tmp[3])
             watts[c] = float(tmp[4])
@@ -48,7 +48,7 @@ def readData(fileName):
             c=c+1
 
     # return filled lists
-    return widths, PIN, watts, wattsErr
+    return widths, PIN, PINErr, watts, wattsErr
 
 def plotXY(x,y):
     """Return TGraph of x, y data sets"""
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     # Read file
     header = readHeader(fileName)
     print header["Wavelength"]
-    widths, PIN, watts, wattsErr = readData(fileName)
+    widths, PIN, PINErr, watts, wattsErr = readData(fileName)
 
     # Scale power values to give photons
     photons, photonErr = scaling(watts, wattsErr, header)
@@ -204,7 +204,7 @@ if __name__ == "__main__":
 
     tc.SetLogy(0)
     # Make PIN plot
-    tmpPlot2 = plotXY(widths,PIN)
+    tmpPlot2 = plotErr(widths,PIN, PINErr)
     # Refine
     name = "PINVsWidth"
     tmpPlot2.SetTitle(name)

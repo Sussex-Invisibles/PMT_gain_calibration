@@ -151,7 +151,7 @@ if __name__ == "__main__":
     #widths = [0,6000]
     print widths
     
-    channel = 5
+    channel = 8
 
     power_meter = Power_Meter( 1, "power_meter", wavelength, pulse_delay_ms*1e-3, fname )  # ID, name, wavelength [nm], pulse period [s]
     sc = serial_command.SerialCommand('/dev/tty.usbserial-FTGA2OCZ')
@@ -206,7 +206,7 @@ if __name__ == "__main__":
         sc.set_pulse_width(width)
         time.sleep(0.1)
         sc.fire_continuous()
-        time.sleep(10)
+        time.sleep(8)
         tmpPPP = ppp_value
         tmpPPPErr = ppp_error
         tmpWatt = Watt_value
@@ -217,11 +217,10 @@ if __name__ == "__main__":
             sc.fire_sequence()
             #time.sleep(1)
             pin = None
-            print "pin init ",pin
             while pin==None:
-                pin, _ = sc.read_pin_sequence()
+                pin, rms, _ = sc.tmp_read_rms()
             try:
-                dataStr = "%i %i %i %i %1.7e %1.2e \n" % (width, int(pin[channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
+                dataStr = "%i %i %1.2f %i %i %1.7e %1.2e \n" % (width, int(pin[channel]), float(rms[channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
                 data.write(dataStr)
                 data.flush()
             except:
@@ -230,7 +229,7 @@ if __name__ == "__main__":
             
             # Print results
             print "*********** DATA FOR WIDTH: %4i ************" % (width)
-            outStr = "Width: \t\t%i \nPIN: \t\t%i \nPhoton no.: \t%1.4e +/- %1.1e \nWatts: \t\t%1.4e +/- %1.1e" % (width, int(pin[channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
+            outStr = "Width: \t\t%i \nPIN: \t\t%i +/- %1.1f \nPhoton no.: \t%1.4e +/- %1.1e \nWatts: \t\t%1.4e +/- %1.1e" % (width, int(pin[channel]), float(pin[channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
             print outStr
             print "*********************************************"
             print ""
