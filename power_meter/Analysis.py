@@ -10,9 +10,10 @@ from ROOT import kRed, kBlue, kWhite
 import time
 #import matplotlib.pyplot as plt
 import numpy as np
+import optparse
+import os
 
 def readHeader(fileName):
-
     # Open file, read only the first line
     with open(fileName, 'r') as file:
         header = file.readline()
@@ -23,15 +24,12 @@ def readHeader(fileName):
 
 
 def readData(fileName):
-
     # Find no. of lines
     noLin = sum(1 for line in open(fileName)) - 1  ###-1 to correct for header
-
     # Define new arrays
-    widths, PIN = np.zeros(noLin), np.zeros(noLin)
+    widths, PIN, PINErr = np.zeros(noLin), np.zeros(noLin), np.zeros(noLin)
     photons, photonErr = np.zeros(noLin), np.zeros(noLin)
     watts, wattsErr = np.zeros(noLin), np.zeros(noLin)
-    
     # Open file
     c = 0
     with open(fileName, 'r') as file:
@@ -41,10 +39,10 @@ def readData(fileName):
             widths[c] = int(tmp[0])
             PIN[c] = int(tmp[1])
             PINErr[c] = float(tmp[2])
-            photons[c] = int(tmp[2])
-            photonErr[c] = int(tmp[3])
-            watts[c] = float(tmp[4])
-            wattsErr[c] = float(tmp[5])
+            photons[c] = int(tmp[3])
+            photonErr[c] = int(tmp[4])
+            watts[c] = float(tmp[5])
+            wattsErr[c] = float(tmp[6])
             c=c+1
 
     # return filled lists
@@ -141,41 +139,45 @@ def lineExpFit(plot):
 
 
 def scaling(rawArr, rawErr, header):
-    
     # New arrays
     scaledArr, scaledErr = np.zeros( len(rawArr) ), np.zeros( len(rawArr) )
-
     # Calculate photon energy (J)
     ePh = (6.626e-34 * 3e8) / (header["Wavelength"]*1e-9)
-    
     # Duty cycle stuff
     pulseWidth = 10e-9;
     ratio = header["Pulse sep"]/pulseWidth
-    
     for i, val in enumerate(rawArr):
         # Calaulate peak power
         pp = rawArr[i] * ratio
         ppErr = rawErr[i] * ratio
-        
         # Calculate no of photons
         scaledArr[i] = (pp*pulseWidth) / ePh
         scaledErr[i] = (ppErr*pulseWidth) / ePh
-
     return scaledArr, scaledErr
 
-
 def calcSettings(p, noPh):
-
     return 0
 
+def check_dir(dname):
+    """Check if directory exists, create it if it doesn't"""
+    direc = os.path.dirname(dname)
+    try:
+        os.stat(direc)
+    except:
+        os.mkdir(direc)
+        print "Made directory %s...." % dname
+    return dname
 
 ###############
 # MAIN FUNCTION
 ###############
 if __name__ == "__main__":
+    parser = optparse.OptionParser()
+    parser.add_option("-c", dest="channel")
+    (options,args) = parser.parse_args()
+    scriptTime = time.time()
 
-    #fileName = "./data/pin_calib_Run2.dat"
-    fileName = "./data/pin_calib_TellieRange.dat"
+    fileName = "./data/pin_calib_TellieRange_Chan%02d.dat" % int(options.channel)
 
     # Read file
     header = readHeader(fileName)
@@ -190,6 +192,7 @@ if __name__ == "__main__":
     tc.SetLogy()
 
     # Make basic plot
+    plotDir = check_dir("./data/results/Channel_%02d/" % int(options.channel))
     tmpPlot = plotErr(widths,photons,np.zeros(len(widths)),photonErr)
     # Refine
     name = "PhotonsVsWidth"
@@ -200,18 +203,18 @@ if __name__ == "__main__":
     #tmpPlot.GetXaxis().SetRangeUser(6000,8000)
     #pars = lineExpFit(tmpPlot)
     tc.Update()
-    tc.SaveAs("./data/results/{:s}.png".format(name))
+    tc.SaveAs("./data/results/Channel_%02d/%s.png" % (int(options.channel),name))
 
     tc.SetLogy(0)
     # Make PIN plot
-    tmpPlot2 = plotErr(widths,PIN, PINErr)
+    tmpPlot2 = plotErr(widths,PIN,np.zeros(len(widths)),PINErr)
     # Refine
     name = "PINVsWidth"
     tmpPlot2.SetTitle(name)
     tmpPlot2.GetXaxis().SetTitle("LED pulse width (14 bit)")
     tmpPlot2.GetYaxis().SetTitle("PIN reading (14 bit)")
     tc.Update()
-    tc.SaveAs("./data/results/{:s}.png".format(name));
+    tc.SaveAs("./data/results/Channel_%02d/%s.png" % (int(options.channel),name))
 
     tc.SetLogx(0)
     tc.SetLogy(0)
@@ -222,4 +225,4 @@ if __name__ == "__main__":
     tmpPlot2.GetXaxis().SetTitle("No. Photons")
     tmpPlot2.GetYaxis().SetTitle("PIN reading (14 bit)")
     tc.Update()
-    tc.SaveAs("./data/results/{:s}.png".format(name));
+    tc.SaveAs("./data/results/Channel_%02d/%s.png" % (int(options.channel),name))

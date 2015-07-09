@@ -64,7 +64,7 @@ if __name__ == "__main__":
     channel = int(options.channel)
     pulse_delay_ms = header["Pulse sep"]*1e3
 
-    sc = serial_command.SerialCommand('/dev/tty.usbserial-FTGA2OCZ')
+    sc = serial_command.SerialCommand('/dev/tty.usbserial-FTE3C0PG')
     sc.clear_channel()
     sc.select_channel(channel)
     sc.set_pulse_width(0)
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     x_div_units = 10e-9 # seconds
     y_offset = 0.5*y_div_units # offset in y (for UK scope)
     x_offset = +2*x_div_units # offset in x (2 divisions to the left)
-    record_length = 100e3 # trace is 1e3 samples long
+    record_length = 1e3 # trace is 1e3 samples long
     half_length = record_length / 2 # For selecting region about trigger point
     ###########################################
     scope.set_horizontal_scale(x_div_units)
@@ -96,14 +96,14 @@ if __name__ == "__main__":
     scope.set_channel_termination(scope_chan, termination)
     scope.set_single_acquisition() # Single signal acquisition mode
     scope.set_record_length(record_length)
-    scope.set_data_mode(half_length-50, half_length+50)
+    scope.set_data_mode(half_length-80, half_length+20)
     scope.lock()
     scope.begin() # Acquires the pre-amble!
 
     #File system stuff
-    saveDir = sweep.check_dir("data/scope_data_%1.1fV/" % float(options.voltage))
+    saveDir = sweep.check_dir("data/scope_data_%1.2fV/" % float(options.voltage))
     sweep.check_dir("%sraw_data/" % saveDir)
-    output_filename = "%s/Chan%02d_%1.1fV.dat" % (saveDir,channel,float(options.voltage))
+    output_filename = "%s/Chan%02d_%1.2fV.dat" % (saveDir,channel,float(options.voltage))
     output_file = file(output_filename,'w')
     output_file.write("#PWIDTH\tPWIDTH Error\tPIN\tPIN Error\tWIDTH\tWIDTH Error\tRISE\tRISE Error\tFALL\t\
 FALL Error\tAREA\tAREA Error\tMinimum\tMinimum Error\n")
@@ -120,7 +120,7 @@ FALL Error\tAREA\tAREA Error\tMinimum\tMinimum Error\n")
         tmpResults = sweep.sweep(saveDir,1,channel,width,pulse_delay_ms,scope,min_volt)        
 
         output_file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n"%(width, 0,
-                                            tmpResults["pin"], 0,
+                                            tmpResults["pin"], tmpResults["pin error"],
                                             tmpResults["width"], tmpResults["width error"],
                                             tmpResults["rise"], tmpResults["rise error"],
                                             tmpResults["fall"], tmpResults["fall error"],

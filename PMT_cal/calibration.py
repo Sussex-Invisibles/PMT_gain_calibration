@@ -33,7 +33,7 @@ def read_scope_scan(fname):
         bits = line.split()
         if len(bits)!=14:
             continue
-        resultsList.append({"ipw":int(bits[0]),"ipw_err": int(bits[1]),"pin":int(bits[2]),"pin_err":int(bits[3]),"width":float(bits[4]),"width_err":float(bits[5]),"rise":float(bits[6]),"rise_err":float(bits[7]),"fall":float(bits[8]),"fall_err":float(bits[9]),"area":float(bits[10]),"area_err":float(bits[11]),"mini":float(bits[12]),"mini_err":float(bits[13])})
+        resultsList.append({"ipw":int(bits[0]),"ipw_err": int(bits[1]),"pin":int(bits[2]),"pin_err":float(bits[3]),"width":float(bits[4]),"width_err":float(bits[5]),"rise":float(bits[6]),"rise_err":float(bits[7]),"fall":float(bits[8]),"fall_err":float(bits[9]),"area":float(bits[10]),"area_err":float(bits[11]),"mini":float(bits[12]),"mini_err":float(bits[13])})
     return resultsList
 
 def read_pin_header(fileName):
@@ -61,7 +61,7 @@ def read_pin_data(fileName):
             tmp = line.split(" ")
             widths[c] = int(tmp[0])
             PIN[c] = int(tmp[1])
-            PINErr[c] = int(tmp[2])
+            PINErr[c] = float(tmp[2])
             photons[c] = int(tmp[3])
             photonErr[c] = int(tmp[4])
             watts[c] = float(tmp[5])
@@ -100,14 +100,15 @@ def scaling(rawArr, rawErr, header):
     ePh = (6.626e-34 * 3e8) / (header["Wavelength"]*1e-9)
     # Duty cycle stuff
     pulseWidth = 10e-9;
-    ratio = header["Pulse sep"]/pulseWidth
+    pulseSep = 44e-6  # BECAUSE WE'RE IN SLAVE MODE, HAD TO MEASURE DIRECTLY!!
+    dutyCycle = pulseWidth/pulseSep
     for i, val in enumerate(rawArr):
         # Calaulate peak power
-        pp = rawArr[i] * ratio
-        ppErr = rawErr[i] * ratio
+        pp = rawArr[i] * dutyCycle
+        ppErr = rawErr[i] * dutyCycle
         # Calculate no of photons
-        scaledArr[i] = (pp*pulseWidth) / ePh
-        scaledErr[i] = (ppErr*pulseWidth) / ePh
+        scaledArr[i] = pp / ePh
+        scaledErr[i] = ppErr / ePh
     return scaledArr, scaledErr
 
 def calcGain(data_list, noPhotons, noPhotonsErr):
@@ -178,8 +179,8 @@ def weighted_avg_and_std(values, weights):
 ###############
 if __name__ == "__main__":
     parser = optparse.OptionParser()
-    parser.add_option("-p", dest="powerFile")
-    parser.add_option("-s", dest="scopeFile")
+    parser.add_option("-v", dest="voltage")
+    parser.add_option("-c", dest="channel")
     (options,args) = parser.parse_args()
     scriptTime = time.time()
 
@@ -187,33 +188,41 @@ if __name__ == "__main__":
     ROOT.gEnv.SetValue('Canvas.SavePrecision', "16")
     tc = ROOT.TCanvas("c1","c1",800,600)
 
+    # Create paths to file
+    powerFile = "data/pin_calib_TellieRange_Chan%02d.dat" % (int(options.channel))
+    scopeFile = "data/scope_data_%1.2fV/Chan%02d_%1.2fV.dat" % (float(options.voltage), int(options.channel), float(options.voltage))
+
     # Read in power_meter data file
-    head = read_pin_header(options.powerFile)
-    wi, PIN, PINErr, watts, wattsErr = read_pin_data(options.powerFile)
+    head = read_pin_header(powerFile)
+    wi, PIN, PINErr, watts, wattsErr = read_pin_data(powerFile)
     ph, phErr = scaling(watts, wattsErr, head)
 
     # Read in PMT-scope data file
-    pmt_data = read_scope_scan(options.scopeFile)
+    pmt_data = read_scope_scan(scopeFile)
     g, gErr = calcGain(pmt_data, ph, phErr)
     
     # Take out bad (zero) data points
-    p =  options.scopeFile.split('/')
+    p = scopeFile.split('/')
     tmpStr = ''
     for it, direc in enumerate(p):
         if it < len(p)-1:
-            tmpStr = tmpStr + '/%s' % direc
-    idx = get_clean_data_points(wi, g, "%s/raw_data/Channel_08/" % (tmpStr))
-    print idx
+            if it == 0:
+                tmpStr = tmpStr + '%s' % direc                
+            else:
+                tmpStr = tmpStr + '/%s' % direc
+    idx = get_clean_data_points(wi, g, "%s/raw_data/Channel_%02d/" % (tmpStr, int(options.channel)))
     photons, photonsErr = ph[idx], phErr[idx]
     gain, gainErr = g[idx], gErr[idx]
     widths, pin, pinErr = wi[idx], PIN[idx], PINErr[idx]
 
     ######### PLOT RESULTS ##########
-    check_dir('results/%s/' % p[-1])
+    sD = check_dir('data/results/Channel_%02d/' % (int(options.channel)))
+    saveDir = check_dir('%s/%s/' % (sD, p[-2]))
     voltage = get_num_from_str(p[-2])
-    final_gain, final_gain_err = weighted_avg_and_std(gain[:-2], gainErr[:-2])
+    print gain[-10:]
+    final_gain, final_gain_err = weighted_avg_and_std(gain[-10:], gainErr[-10:])
     print ######################################
-    print "\nGain at %1.1fV is: %.3e +/- %.3e\n" % (voltage, final_gain, final_gain_err)
+    print "\nGain at %1.2fV is: %.3e +/- %.3e\n" % (voltage, final_gain, final_gain_err)
     print ######################################
     
     ### Fit stuff - doesn't always hold
@@ -239,7 +248,7 @@ if __name__ == "__main__":
     axis = plt.gca()
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     axis.text(0.65, 0.95, text_str, transform=axis.transAxes, fontsize=14,verticalalignment='top', bbox=props)
-    saveStr = 'results/%s/GainVsPhotons.png' % p[-1]
+    saveStr = '%s/GainVsPhotons.png' % (saveDir)
     plt.savefig(saveStr, dpi=100)
 
     plt.figure(num=2, figsize=(10, 8), dpi=80, facecolor='w')
@@ -248,7 +257,7 @@ if __name__ == "__main__":
     plt.xlabel("IPW (14 bit)")
     plt.ylabel("Gain")
     #plt.show()                                                                                                                         
-    saveStr = 'results/%s/GainVsIPW.png' % p[-1]
+    saveStr = '%s/GainVsIPW.png' % (saveDir)
     plt.savefig(saveStr, dpi=100)
 
     plt.figure(num=3, figsize=(10, 8), dpi=80, facecolor='w')
@@ -257,7 +266,7 @@ if __name__ == "__main__":
     plt.xlabel("PIN (16 bit)")
     plt.ylabel("No. photons")
     plt.legend()
-    saveStr = 'results/%s/PINVsPhotons.png' % p[-1]
+    saveStr = '%s/PINVsPhotons.png' % (saveDir)
     plt.savefig(saveStr, dpi=100)
 
     plt.figure(num=4, figsize=(10, 8), dpi=80, facecolor='w')
@@ -266,7 +275,7 @@ if __name__ == "__main__":
     plt.xlabel("IPW (14 bit)")
     plt.ylabel("PIN (16 bit)")
     plt.legend()
-    saveStr = 'results/%s/IPWVsPIN.png' % p[-1]
+    saveStr = '%s/IPWVsPIN.png' % (saveDir)
     plt.savefig(saveStr, dpi=100)
 
     print "Script took : \t{:1.2f} min".format( (time.time()-scriptTime)/60 )

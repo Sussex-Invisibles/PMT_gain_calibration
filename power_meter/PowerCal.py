@@ -139,22 +139,25 @@ class Power_Meter(threading.Thread):
 #   MAIN FUNCTION
 ##########################
 if __name__ == "__main__":
-    
+parser = optparse.OptionParser()
+    parser.add_option("-c", dest="channel")
+    (options,args) = parser.parse_args()    
     #Datafile name
-    fname = "./data/pin_calib_TellieRange.dat"
+
+    fname = "./data/pin_calib_TellieRange_Chan%02d.dat" % int(options.channel)
 
     pulse_delay_ms = 25e-3  # in ms (for direct input to set_pulse_delay func)
-    wavelength=495          # in nm
+    wavelength=500          # in nm
 
     # Set up range of widths to be run
     widths = range(0,9000,100)
     #widths = [0,6000]
     print widths
     
-    channel = 8
+    channel = int(options.channel)
 
     power_meter = Power_Meter( 1, "power_meter", wavelength, pulse_delay_ms*1e-3, fname )  # ID, name, wavelength [nm], pulse period [s]
-    sc = serial_command.SerialCommand('/dev/tty.usbserial-FTGA2OCZ')
+    sc = serial_command.SerialCommand('/dev/tty.usbserial-FTE3C0PG')
 
     LOCK = threading.RLock()
     with LOCK:
@@ -229,13 +232,10 @@ if __name__ == "__main__":
             
             # Print results
             print "*********** DATA FOR WIDTH: %4i ************" % (width)
-            outStr = "Width: \t\t%i \nPIN: \t\t%i +/- %1.1f \nPhoton no.: \t%1.4e +/- %1.1e \nWatts: \t\t%1.4e +/- %1.1e" % (width, int(pin[channel]), float(pin[channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
+            outStr = "Width: \t\t%i \nPIN: \t\t%i +/- %1.1f \nPhoton no.: \t%1.4e +/- %1.1e \nWatts: \t\t%1.4e +/- %1.1e" % (width, int(pin[channel]), float(rms[channel]), tmpPPP, tmpPPPErr, tmpWatt, tmpWattErr)
             print outStr
             print "*********************************************"
             print ""
 
     power_meter.exit_flag = 1
     data.close()
-
-
-        
