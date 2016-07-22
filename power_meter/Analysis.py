@@ -21,14 +21,13 @@ def readHeader(fileName):
     # Return as dict.
     return {"Wavelength" : int(tmp[0]), "Pulse sep" : float(tmp[1]), "Rate" : int(tmp[2]), "Temp" : float(tmp[3]), "Pedestal" : float(tmp[4]) }
 
-
 def readData(fileName):
 
     # Find no. of lines
     noLin = sum(1 for line in open(fileName)) - 1  ###-1 to correct for header
 
     # Define new arrays
-    widths, PIN = np.zeros(noLin), np.zeros(noLin)
+    widths, PIN, PINErr = np.zeros(noLin), np.zeros(noLin), np.zeros(noLin)
     photons, photonErr = np.zeros(noLin), np.zeros(noLin)
     watts, wattsErr = np.zeros(noLin), np.zeros(noLin)
     
@@ -40,7 +39,7 @@ def readData(fileName):
             tmp = line.split(" ")
             widths[c] = int(tmp[0])
             PIN[c] = int(tmp[1])
-            PINErr[c] = float(tmp[2])
+            #PINErr[c] = float(tmp[2])
             photons[c] = int(tmp[2])
             photonErr[c] = int(tmp[3])
             watts[c] = float(tmp[4])
@@ -63,8 +62,10 @@ def plotXY(x,y):
     time.sleep(5)
     return plot
 
-def plotErr(x,y,xErr,yErr):
+def plotErr(x, y, yErr, xErr=None):
     """Return TGraphErrors of data sets"""
+    if xErr is None:
+        xErr = np.zeros(len(yErr))
     # Plot data set
     plot = ROOT.TGraphErrors(len(x), x, y, xErr, yErr)
     plot.SetMarkerStyle(8)
@@ -94,7 +95,6 @@ def fitFunc1(x, par):
     if(x[0] > 7700):
         print x[0], par[5], par[6]
         return pol1(x,par[5],par[6])
-
 
 def lineExpFit(plot):
 
@@ -139,7 +139,6 @@ def lineExpFit(plot):
 
     return pT
 
-
 def scaling(rawArr, rawErr, header):
     
     # New arrays
@@ -148,24 +147,13 @@ def scaling(rawArr, rawErr, header):
     # Calculate photon energy (J)
     ePh = (6.626e-34 * 3e8) / (header["Wavelength"]*1e-9)
     
-    # Duty cycle stuff
-    pulseWidth = 10e-9;
-    ratio = header["Pulse sep"]/pulseWidth
-    
     for i, val in enumerate(rawArr):
-        # Calaulate peak power
-        pp = rawArr[i] * ratio
-        ppErr = rawErr[i] * ratio
-        
         # Calculate no of photons
-        scaledArr[i] = (pp*pulseWidth) / ePh
-        scaledErr[i] = (ppErr*pulseWidth) / ePh
-
+        scaledArr[i] = (rawArr[i]*header["Pulse sep"]) / ePh
+        scaledErr[i] = (rawErr[i]*header["Pulse sep"]) / ePh
     return scaledArr, scaledErr
 
-
 def calcSettings(p, noPh):
-
     return 0
 
 
@@ -200,18 +188,20 @@ if __name__ == "__main__":
     #tmpPlot.GetXaxis().SetRangeUser(6000,8000)
     #pars = lineExpFit(tmpPlot)
     tc.Update()
-    tc.SaveAs("./data/results/{:s}.png".format(name))
+    saveName = "./power_meter/results/%s.png" % (name)
+    tc.SaveAs(saveName)
 
     tc.SetLogy(0)
     # Make PIN plot
-    tmpPlot2 = plotErr(widths,PIN, PINErr)
+    tmpPlot2 = plotErr(widths,PIN,PINErr)
     # Refine
     name = "PINVsWidth"
     tmpPlot2.SetTitle(name)
     tmpPlot2.GetXaxis().SetTitle("LED pulse width (14 bit)")
     tmpPlot2.GetYaxis().SetTitle("PIN reading (14 bit)")
     tc.Update()
-    tc.SaveAs("./data/results/{:s}.png".format(name));
+    saveName = "./power_meter/results/%s.png" % (name)
+    tc.SaveAs(saveName)
 
     tc.SetLogx(0)
     tc.SetLogy(0)
@@ -222,4 +212,5 @@ if __name__ == "__main__":
     tmpPlot2.GetXaxis().SetTitle("No. Photons")
     tmpPlot2.GetYaxis().SetTitle("PIN reading (14 bit)")
     tc.Update()
-    tc.SaveAs("./data/results/{:s}.png".format(name));
+    saveName = "./power_meter/results/%s.png" % (name)
+    tc.SaveAs(saveName)

@@ -61,11 +61,11 @@ def read_pin_data(fileName):
             tmp = line.split(" ")
             widths[c] = int(tmp[0])
             PIN[c] = int(tmp[1])
-            PINErr[c] = int(tmp[2])
-            photons[c] = int(tmp[3])
-            photonErr[c] = int(tmp[4])
-            watts[c] = float(tmp[5])
-            wattsErr[c] = float(tmp[6])
+            #PINErr[c] = int(tmp[2])
+            photons[c] = int(tmp[2])
+            photonErr[c] = int(tmp[3])
+            watts[c] = float(tmp[4])
+            wattsErr[c] = float(tmp[5])
             c=c+1
     # return filled lists
     return widths, PIN, PINErr, watts, wattsErr
@@ -96,18 +96,14 @@ def check_saturation(y):
 def scaling(rawArr, rawErr, header):
     # New arrays
     scaledArr, scaledErr = np.zeros( len(rawArr) ), np.zeros( len(rawArr) )
+
     # Calculate photon energy (J)
     ePh = (6.626e-34 * 3e8) / (header["Wavelength"]*1e-9)
-    # Duty cycle stuff
-    pulseWidth = 10e-9;
-    ratio = header["Pulse sep"]/pulseWidth
+    
     for i, val in enumerate(rawArr):
-        # Calaulate peak power
-        pp = rawArr[i] * ratio
-        ppErr = rawErr[i] * ratio
         # Calculate no of photons
-        scaledArr[i] = (pp*pulseWidth) / ePh
-        scaledErr[i] = (ppErr*pulseWidth) / ePh
+        scaledArr[i] = (rawArr[i]*header["Pulse sep"]) / ePh
+        scaledErr[i] = (rawErr[i]*header["Pulse sep"]) / ePh
     return scaledArr, scaledErr
 
 def calcGain(data_list, noPhotons, noPhotonsErr):
@@ -202,7 +198,7 @@ if __name__ == "__main__":
     for it, direc in enumerate(p):
         if it < len(p)-1:
             tmpStr = tmpStr + '/%s' % direc
-    idx = get_clean_data_points(wi, g, "%s/raw_data/Channel_08/" % (tmpStr))
+    idx = get_clean_data_points(wi, g, ".%s/raw_data/Channel_05/" % (tmpStr))
     print idx
     photons, photonsErr = ph[idx], phErr[idx]
     gain, gainErr = g[idx], gErr[idx]
@@ -268,5 +264,6 @@ if __name__ == "__main__":
     plt.legend()
     saveStr = 'results/%s/IPWVsPIN.png' % p[-1]
     plt.savefig(saveStr, dpi=100)
+    #plt.show()
 
     print "Script took : \t{:1.2f} min".format( (time.time()-scriptTime)/60 )
